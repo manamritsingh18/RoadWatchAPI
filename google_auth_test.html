@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveTrust - Google Auth Test</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 80px auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 25px;
+            padding: 15px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>DriveTrust</h1>
+    <h2>Google Authentication Test</h2>
+
+    <button id="googleLogin">
+        Continue with Google
+    </button>
+
+    <div id="result">
+        Not logged in
+    </div>
+
+    <script>
+        // Replace these with your Supabase project values.
+        // Use ONLY the anon/publishable key here.
+        const SUPABASE_URL = "https://fbjjoktuzirhpqqpzfbo.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZiampva3R1emlyaHBxcXB6ZmJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MjA1MzcsImV4cCI6MjEwMDk5NjUzN30.sp9Kgpt7alImqzhzWkWo1Gx4FTzut0Fzm9IPu8fX0po";
+
+        const supabaseClient = window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+        );
+
+        const result = document.getElementById("result");
+
+        // Google Login
+        document.getElementById("googleLogin").addEventListener("click", async () => {
+
+            result.textContent = "Redirecting to Google...";
+
+            const { error } = await supabaseClient.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: window.location.origin + window.location.pathname
+                }
+            });
+
+            if (error) {
+                result.textContent = "Login failed:\n" + error.message;
+            }
+        });
+
+        // Check whether the user returned authenticated
+        supabaseClient.auth.getSession().then(({ data, error }) => {
+
+            if (error) {
+                result.textContent = "Session error:\n" + error.message;
+                return;
+            }
+
+            if (data.session) {
+                const user = data.session.user;
+
+                result.textContent =
+                    "GOOGLE LOGIN SUCCESSFUL\n\n" +
+                    "Email: " + (user.email || "Not available") + "\n" +
+                    "User ID: " + user.id + "\n" +
+                    "Provider: " + (
+                        user.app_metadata?.provider || "unknown"
+                    );
+            }
+        });
+
+        // Listen for authentication changes
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+
+            console.log("Auth event:", event);
+
+            if (event === "SIGNED_IN" && session) {
+                console.log("Google login successful");
+                console.log("User ID:", session.user.id);
+                console.log("Email:", session.user.email);
+            }
+        });
+    </script>
+
+</body>
+</html>
