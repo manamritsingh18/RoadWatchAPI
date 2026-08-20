@@ -14,41 +14,42 @@ class EvidenceService:
         vehicle_number: str,
         image_urls: List[str],
         video_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
         """
-        Save evidence images against a vehicle identified by its number plate.
-
-        - Looks up the vehicle by number_plate; creates it if it doesn't exist.
-        - Inserts one row per image URL into the 'evidence' table.
+        Save evidence image URLs for a vehicle, optionally tagged with location.
 
         Args:
-            vehicle_number: License plate string (e.g. 'MH12AB1234')
-            image_urls:     List of image URL strings
-            video_id:       Optional UUID of the related video record
+            vehicle_number: License plate number
+            image_urls:     List of evidence image URLs
+            video_id:       Optional linked video ID
+            latitude:       Optional GPS latitude for this evidence
+            longitude:      Optional GPS longitude for this evidence
 
         Returns:
-            dict with vehicle_id, evidence_count, saved_urls
+            List of inserted evidence row dicts
         """
         if not image_urls:
             raise ValueError("image_urls must not be empty")
 
-        # Resolve vehicle — reuse existing get_or_create from ReportService
-        # vehicle_id here is a BIGINT (int) since vehicles.id is BIGINT
+        # get_or_create_vehicle returns a plain integer vehicle ID
         vehicle_id = ReportService.get_or_create_vehicle(vehicle_number)
         logger.info(
             f"Saving {len(image_urls)} evidence image(s) "
             f"for vehicle '{vehicle_number}' (id={vehicle_id})"
         )
 
-        rows = []
-        for url in image_urls:
-            row: Dict[str, Any] = {
+        rows = [
+            {
                 "vehicle_id": vehicle_id,
+                "video_id": video_id,
                 "image_url": url,
+                "latitude": latitude,
+                "longitude": longitude,
             }
-            if video_id:
-                row["video_id"] = video_id
-            rows.append(row)
+            for url in image_urls
+        ]
 
         try:
             response = (
@@ -61,17 +62,11 @@ class EvidenceService:
             if not response.data:
                 raise RuntimeError("Evidence insert returned no data")
 
-            saved_urls = [row["image_url"] for row in response.data]
             logger.info(
-                f"Saved {len(saved_urls)} evidence row(s) "
+                f"Saved {len(response.data)} evidence row(s) "
                 f"for vehicle_id={vehicle_id}"
             )
-
-            return {
-                "vehicle_id": vehicle_id,
-                "evidence_count": len(saved_urls),
-                "saved_urls": saved_urls,
-            }
+            return response.data
 
         except Exception as e:
             logger.exception(f"Failed to save evidence: {str(e)}")

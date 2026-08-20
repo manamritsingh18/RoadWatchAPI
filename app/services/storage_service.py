@@ -184,3 +184,26 @@ class StorageService:
         except Exception as e:
             logger.exception(f"Failed to generate public URL for {file_path}: {str(e)}")
             return None
+
+    @staticmethod
+    def create_signed_upload_url(filename: str) -> dict:
+        """
+        Generate a Supabase signed upload URL for direct client upload
+        to the 'videos' bucket, bypassing the backend entirely.
+
+        Args:
+            filename: Target filename/path inside the 'videos' bucket
+
+        Returns:
+            dict with storage_path, upload_url, and token
+        """
+        try:
+            response = supabase.storage.from_("videos").create_signed_upload_url(filename)
+            return {
+                "storage_path": filename,
+                "upload_url": response["signed_url"],
+                "token": response.get("token"),
+            }
+        except Exception as e:
+            logger.exception(f"Failed to create signed upload URL: {str(e)}")
+            raise RuntimeError(f"Failed to create signed upload URL: {str(e)}")

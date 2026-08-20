@@ -71,18 +71,20 @@ async def save_vehicle_evidence(
             f"— {len(body.image_urls)} image(s)"
         )
 
-        result = EvidenceService.save_evidence_for_vehicle(
+        rows = EvidenceService.save_evidence_for_vehicle(
             vehicle_number=vehicle_number,
             image_urls=body.image_urls,
             video_id=body.video_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
         )
 
         return EvidenceCreateResponse(
             success=True,
-            vehicle_id=result["vehicle_id"],
+            vehicle_id=rows[0]["vehicle_id"],
             vehicle_number=vehicle_number,
-            evidence_count=result["evidence_count"],
-            saved_urls=result["saved_urls"],
+            evidence_count=len(rows),
+            saved_urls=[r["image_url"] for r in rows],
         )
 
     except ValueError as e:
