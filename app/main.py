@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from app.routes.uploads import router as upload_router
+from app.routes.uploads import router as videos_router
+from app.routes.vehicles import router as vehicles_router
 from app.routes.auth import router as auth_router
 
 app = FastAPI(
@@ -8,8 +9,9 @@ app = FastAPI(
 )
 
 # Register routers
-app.include_router(upload_router)
 app.include_router(auth_router)
+app.include_router(videos_router)
+app.include_router(vehicles_router)
 
 
 @app.get("/")

@@ -3,15 +3,61 @@ import logging
 import os
 from pathlib import Path
 
+from fastapi import UploadFile
+
 from app.database.supabase import supabase
 
 logger = logging.getLogger(__name__)
+
+# Local directory where videos will be saved until cloud storage is available
+LOCAL_UPLOAD_DIR = Path("uploads/videos")
 
 
 class StorageService:
 
     @staticmethod
-    def upload_video(file):
+    def save_locally(file: UploadFile) -> dict:
+        """
+        Save an uploaded video to the local filesystem.
+        Used as a placeholder until Azure/AWS cloud storage is configured.
+
+        Args:
+            file: FastAPI UploadFile object
+
+        Returns:
+            dict with filename and local_path
+        """
+        try:
+            # Ensure the upload directory exists
+            LOCAL_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+            extension = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "mp4"
+            filename = f"{uuid.uuid4()}.{extension}"
+            local_path = LOCAL_UPLOAD_DIR / filename
+
+            # Reset file pointer to start
+            try:
+                file.file.seek(0)
+            except Exception:
+                pass
+
+            file_bytes = file.file.read()
+
+            with open(local_path, "wb") as f:
+                f.write(file_bytes)
+
+            logger.info(f"Video saved locally: {local_path}")
+            return {
+                "filename": filename,
+                "local_path": str(local_path),
+            }
+
+        except Exception as e:
+            logger.exception(f"Local video save failed: {str(e)}")
+            raise RuntimeError(f"Failed to save video locally: {str(e)}")
+
+    @staticmethod
+    def upload_video(file: UploadFile) -> dict:
         """
         Upload a video to Supabase Storage 'videos' bucket.
         Args:

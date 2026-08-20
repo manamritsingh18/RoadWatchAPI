@@ -474,10 +474,14 @@ def test_auth_login(client):
                 )
 
                 # Never print the actual JWT.
-                print(
-                    f"  {INFO}  JWT is available for "
-                    f"authenticated API testing"
-                )
+                # print(
+                #     f"  {INFO}  JWT is available for "
+                #     f"authenticated API testing"
+                # )
+
+                print("\nACCESS TOKEN:")
+                print(access_token)
+                print()
 
                 return True
 

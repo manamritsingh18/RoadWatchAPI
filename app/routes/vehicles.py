@@ -1,0 +1,108 @@
+import logging
+
+from fastapi import APIRouter, HTTPException, status, Depends
+
+from app.schemas.evidence import EvidenceCreateRequest, EvidenceCreateResponse
+from app.services.evidence_service import EvidenceService
+from app.utils.auth import get_current_user
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/vehicles",
+    tags=["Vehicles"],
+)
+
+
+# ==============================================================
+# POST /vehicles/{vehicle_number}/evidence
+# Save evidence images against a vehicle number plate
+# ==============================================================
+@router.post(
+    "/{vehicle_number}/evidence",
+    response_model=EvidenceCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def save_vehicle_evidence(
+    vehicle_number: str,
+    body: EvidenceCreateRequest,
+    current_user=Depends(get_current_user),
+):
+    """
+    Save an array of evidence images against a vehicle identified
+    by its number plate.
+
+    - If the vehicle does not exist, it is created automatically.
+    - Each image URL in the array is stored as a separate evidence row.
+    - Optionally link to an existing video record via `video_id`.
+
+    Path param:
+        vehicle_number — License plate string (e.g. 'MH12AB1234')
+
+    Request body:
+        {
+            "image_urls": ["https://...", "https://..."],
+            "video_id": "optional-uuid"         // optional
+        }
+    """
+    vehicle_number = vehicle_number.strip().upper()
+
+    if not vehicle_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": "vehicle_number must not be empty",
+            },
+        )
+
+    if not body.image_urls:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": "image_urls must not be empty",
+            },
+        )
+
+    try:
+        logger.info(
+            f"Saving evidence for vehicle '{vehicle_number}' "
+            f"— {len(body.image_urls)} image(s)"
+        )
+
+        result = EvidenceService.save_evidence_for_vehicle(
+            vehicle_number=vehicle_number,
+            image_urls=body.image_urls,
+            video_id=body.video_id,
+        )
+
+        return EvidenceCreateResponse(
+            success=True,
+            vehicle_id=result["vehicle_id"],
+            vehicle_number=vehicle_number,
+            evidence_count=result["evidence_count"],
+            saved_urls=result["saved_urls"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "success": False,
+                "error": str(e),
+            },
+        )
+
+    except Exception as e:
+        logger.exception(
+            f"Failed to save evidence for '{vehicle_number}': {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "success": False,
+                "error": "Failed to save evidence",
+                "detail": str(e),
+            },
+        )
