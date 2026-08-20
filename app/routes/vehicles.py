@@ -35,15 +35,6 @@ async def save_vehicle_evidence(
     - If the vehicle does not exist, it is created automatically.
     - Each image URL in the array is stored as a separate evidence row.
     - Optionally link to an existing video record via `video_id`.
-
-    Path param:
-        vehicle_number — License plate string (e.g. 'MH12AB1234')
-
-    Request body:
-        {
-            "image_urls": ["https://...", "https://..."],
-            "video_id": "optional-uuid"         // optional
-        }
     """
     vehicle_number = vehicle_number.strip().upper()
 
@@ -105,6 +96,89 @@ async def save_vehicle_evidence(
             detail={
                 "success": False,
                 "error": "Failed to save evidence",
+                "detail": str(e),
+            },
+        )
+
+
+# ==============================================================
+# GET /vehicles
+# Get all vehicles
+# ==============================================================
+@router.get("")
+async def list_vehicles(
+    current_user=Depends(get_current_user),
+):
+    """
+    Return all vehicles on file.
+    """
+    try:
+        vehicles = EvidenceService.get_all_vehicles()
+
+        return {
+            "success": True,
+            "count": len(vehicles),
+            "data": vehicles,
+        }
+
+    except Exception as e:
+        logger.exception(
+            f"Failed to fetch vehicles: {str(e)}"
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "success": False,
+                "error": "Failed to fetch vehicles",
+                "detail": str(e),
+            },
+        )
+
+
+# ==============================================================
+# GET /vehicles/{number_plate}/evidence
+# Get vehicle information + all evidence
+# ==============================================================
+@router.get("/{number_plate}/evidence")
+async def get_vehicle_evidence(
+    number_plate: str,
+    current_user=Depends(get_current_user),
+):
+    """
+    Return vehicle information along with all evidence
+    associated with that vehicle.
+    """
+    try:
+        result = EvidenceService.get_evidence_for_vehicle(
+            number_plate=number_plate
+        )
+
+        return {
+            "success": True,
+            "data": result,
+        }
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "success": False,
+                "error": str(e),
+            },
+        )
+
+    except Exception as e:
+        logger.exception(
+            f"Failed to fetch evidence for vehicle "
+            f"'{number_plate}': {str(e)}"
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "success": False,
+                "error": "Failed to fetch vehicle evidence",
                 "detail": str(e),
             },
         )

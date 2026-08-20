@@ -35,6 +35,7 @@ class EvidenceService:
 
         # get_or_create_vehicle returns a plain integer vehicle ID
         vehicle_id = ReportService.get_or_create_vehicle(vehicle_number)
+
         logger.info(
             f"Saving {len(image_urls)} evidence image(s) "
             f"for vehicle '{vehicle_number}' (id={vehicle_id})"
@@ -66,8 +67,96 @@ class EvidenceService:
                 f"Saved {len(response.data)} evidence row(s) "
                 f"for vehicle_id={vehicle_id}"
             )
+
             return response.data
 
         except Exception as e:
             logger.exception(f"Failed to save evidence: {str(e)}")
             raise RuntimeError(f"Failed to save evidence: {str(e)}")
+
+    # ==============================================================
+    # GET ALL VEHICLES
+    # ==============================================================
+
+    @staticmethod
+    def get_all_vehicles() -> List[Dict[str, Any]]:
+        """
+        Return all vehicles on file.
+        """
+        try:
+            response = (
+                supabase
+                .table("vehicles")
+                .select("*")
+                .order("last_seen", desc=True)
+                .execute()
+            )
+
+            return response.data or []
+
+        except Exception as e:
+            logger.exception(f"Failed to fetch vehicles: {str(e)}")
+            raise RuntimeError(f"Failed to fetch vehicles: {str(e)}")
+
+    # ==============================================================
+    # GET VEHICLE + EVIDENCE
+    # ==============================================================
+
+    @staticmethod
+    def get_evidence_for_vehicle(
+        number_plate: str,
+    ) -> Dict[str, Any]:
+        """
+        Return a vehicle's information along with all
+        evidence rows associated with that vehicle.
+
+        Args:
+            number_plate: Vehicle license plate number.
+
+        Returns:
+            Dictionary containing vehicle information
+            and associated evidence.
+        """
+        number_plate = number_plate.strip().upper()
+
+        try:
+            vehicle_response = (
+                supabase
+                .table("vehicles")
+                .select("*")
+                .eq("number_plate", number_plate)
+                .execute()
+            )
+
+            if not vehicle_response.data:
+                raise ValueError(
+                    f"No vehicle found with number_plate: {number_plate}"
+                )
+
+            vehicle = vehicle_response.data[0]
+
+            evidence_response = (
+                supabase
+                .table("evidence")
+                .select("*")
+                .eq("vehicle_id", vehicle["id"])
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            return {
+                "vehicle": vehicle,
+                "evidence": evidence_response.data or [],
+            }
+
+        except ValueError:
+            raise
+
+        except Exception as e:
+            logger.exception(
+                f"Failed to fetch evidence for vehicle "
+                f"{number_plate}: {str(e)}"
+            )
+            raise RuntimeError(
+                f"Failed to fetch evidence for vehicle: {str(e)}"
+            )
