@@ -15,6 +15,7 @@ class VideoService:
         original_name: str,
         blob_url: str,
         user_id: Optional[str] = None,
+        vehicle_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Insert a new video row into the 'videos' table with status 'unprocessed'.
@@ -24,6 +25,7 @@ class VideoService:
             original_name: The original filename from the client upload
             blob_url:      Public Supabase Storage URL for the uploaded video
             user_id:       Supabase auth user UUID (from JWT)
+            vehicle_type:  Vehicle type provided by client (e.g. 'car', 'bike')
 
         Returns:
             dict with id, filename, status, uploaded_at
@@ -33,6 +35,7 @@ class VideoService:
                 "filename": filename,
                 "original_name": original_name,
                 "blob_url": blob_url,
+                "vehicle_type": vehicle_type,
                 "status": "unprocessed",
                 "uploaded_by": user_id,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(),
@@ -57,6 +60,7 @@ class VideoService:
         original_name: str,
         storage_path: str,
         user_id: Optional[str] = None,
+        vehicle_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Pre-create a video DB row before the client uploads the file directly
@@ -68,6 +72,7 @@ class VideoService:
             original_name: Original filename as provided by the client
             storage_path:  Path inside the bucket (stored in local_path for now)
             user_id:       Supabase auth user UUID
+            vehicle_type:  Vehicle type provided by client (e.g. 'car', 'bike')
 
         Returns:
             Inserted video row dict
@@ -78,6 +83,7 @@ class VideoService:
                 "original_name": original_name,
                 "local_path": storage_path,
                 "blob_url": None,
+                "vehicle_type": vehicle_type,
                 "status": "unprocessed",
                 "uploaded_by": user_id,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(),
@@ -114,7 +120,11 @@ class VideoService:
             response = (
                 supabase
                 .table("videos")
-                .update({"blob_url": blob_url, "local_path": storage_path})
+                .update({
+                    "blob_url": blob_url,
+                    "local_path": storage_path,
+                    "video_url": blob_url,
+                })
                 .eq("id", video_id)
                 .execute()
             )
@@ -158,20 +168,20 @@ class VideoService:
     def update_video_status(
         video_id: str,
         status: str,
-        error_message: Optional[str] = None,
+        error_reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Update the status of a video record.
 
         Args:
             video_id:      UUID of the video row
-            status:        New status — 'processing' | 'processed' | 'failed'
-            error_message: Optional error detail (used when status = 'failed')
+            status:        New status — 'processing' | 'completed' | 'failed'
+            error_reason:  Optional error detail (used when status = 'failed')
 
         Returns:
             Updated video row dict
         """
-        allowed = {"processing", "processed", "failed"}
+        allowed = {"processing", "completed", "failed"}
         if status not in allowed:
             raise ValueError(
                 f"Invalid status '{status}'. Must be one of: {allowed}"
@@ -180,11 +190,14 @@ class VideoService:
         try:
             update_data: Dict[str, Any] = {"status": status}
 
-            if status == "processed":
+            if status == "processing":
+                update_data["processing_started_at"] = datetime.now(timezone.utc).isoformat()
+
+            if status == "completed":
                 update_data["processed_at"] = datetime.now(timezone.utc).isoformat()
 
-            if error_message:
-                update_data["error_message"] = error_message
+            if error_reason:
+                update_data["error_reason"] = error_reason
 
             response = (
                 supabase
