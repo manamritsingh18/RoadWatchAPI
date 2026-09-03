@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from app.routes.uploads import router as videos_router
 from app.routes.vehicles import router as vehicles_router
 from app.routes.auth import router as auth_router
-from app.routes.vehicle_records import router as vehicle_records_router
 
 app = FastAPI(
     title="DriveTrust Backend",
@@ -13,7 +12,6 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(videos_router)
 app.include_router(vehicles_router)
-app.include_router(vehicle_records_router)
 
 
 @app.get("/")
